@@ -1,0 +1,399 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Shared)
+  postgres:
+    image: postgres:15
+    container_name: helpdesk_postgres
+    environment:
+      POSTGRES_DB: helpdesk_main
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: helpdesk_secure_2024
+      POSTGRES_MULTIPLE_DATABASES: zammad,bookstack,ai_service
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./config/postgres/demo_data.sql:/docker-entrypoint-initdb.d/02-demo-data.sql
+      - ./scripts/create_multiple_dbs.sh:/docker-entrypoint-initdb.d/00-create-dbs.sh
+    ports:
+      - "5432:5432"
+    networks:
+      - helpdesk_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d helpdesk_main"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: helpdesk_redis
+    command: redis-server --appendonly yes --requirepass helpdesk_redis_2024
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - helpdesk_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Elasticsearch for Zammad
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: helpdesk_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - bootstrap.memory_lock=true
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - helpdesk_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+
+  # Ollama for Local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: helpdesk_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    networks:
+      - helpdesk_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: helpdesk_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - helpdesk_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Zammad Ticketing System
+  zammad-backup:
+    command: ["zammad", "run", "rails", "r", "Setting.set('es_url', 'http://elasticsearch:9200')"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASS=helpdesk_secure_2024
+      - POSTGRESQL_DB=zammad
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    restart: unless-stopped
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  zammad-elasticsearch:
+    command: ["zammad", "run", "rails", "r", "SearchIndexBackend.rebuild"]
+    depends_on:
+      - zammad-backup
+    environment:
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASS=helpdesk_secure_2024
+      - POSTGRESQL_DB=zammad
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    restart: on-failure
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  zammad-init:
+    command: ["zammad", "run", "rails", "r", "Setting.set('system_init_done', true)"]
+    depends_on:
+      - zammad-backup
+    environment:
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASS=helpdesk_secure_2024
+      - POSTGRESQL_DB=zammad
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    restart: on-failure
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  zammad-memcached:
+    command: memcached -m 256M
+    image: memcached:1.6.22-alpine
+    restart: unless-stopped
+    networks:
+      - helpdesk_network
+
+  zammad-nginx:
+    command: ["zammad", "run", "nginx"]
+    depends_on:
+      - zammad-railsserver
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  zammad-railsserver:
+    command: ["zammad", "run", "rails"]
+    depends_on:
+      - zammad-backup
+      - zammad-elasticsearch
+      - zammad-init
+    environment:
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASS=helpdesk_secure_2024
+      - POSTGRESQL_DB=zammad
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    restart: unless-stopped
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  zammad-scheduler:
+    command: ["zammad", "run", "scheduler"]
+    depends_on:
+      - zammad-backup
+      - zammad-elasticsearch
+      - zammad-init
+    environment:
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASS=helpdesk_secure_2024
+      - POSTGRESQL_DB=zammad
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    restart: unless-stopped
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  zammad-websocket:
+    command: ["zammad", "run", "websocket"]
+    depends_on:
+      - zammad-backup
+      - zammad-elasticsearch
+      - zammad-init
+    environment:
+      - MEMCACHE_SERVERS=memcached:11211
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASS=helpdesk_secure_2024
+      - POSTGRESQL_DB=zammad
+      - POSTGRESQL_HOST=postgres
+      - POSTGRESQL_PORT=5432
+      - REDIS_URL=redis://redis:6379
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    image: zammad/zammad-docker-compose:zammad-postgresql-latest
+    restart: unless-stopped
+    volumes:
+      - zammad_data:/opt/zammad
+    networks:
+      - helpdesk_network
+
+  # BookStack Knowledge Base
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: helpdesk_bookstack
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - APP_URL=http://localhost:6875
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASS=helpdesk_secure_2024
+      - DB_DATABASE=bookstack
+      - MAIL_DRIVER=smtp
+      - MAIL_HOST=mailhog
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+    volumes:
+      - bookstack_data:/config
+    ports:
+      - "6875:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - helpdesk_network
+    restart: unless-stopped
+
+  # AI Service (FastAPI Backend)
+  ai-service:
+    build: ./ai-service
+    container_name: helpdesk_ai_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://postgres:helpdesk_secure_2024@postgres:5432/ai_service
+      - REDIS_URL=redis://:helpdesk_redis_2024@redis:6379
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - QDRANT_URL=http://qdrant:6333
+      - ZAMMAD_URL=http://zammad-nginx:8080
+      - ZAMMAD_API_TOKEN=${ZAMMAD_API_TOKEN:-demo_token}
+      - BOOKSTACK_URL=http://bookstack:80
+      - BOOKSTACK_API_TOKEN=${BOOKSTACK_API_TOKEN:-demo_token}
+      - SECRET_KEY=ai_helpdesk_secret_key_2024_change_in_production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./logs/ai-service:/app/logs
+      - ./ai-service:/app
+    networks:
+      - helpdesk_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # React Frontend
+  frontend:
+    build: ./frontend
+    container_name: helpdesk_frontend
+    depends_on:
+      - ai-service
+    environment:
+      - REACT_APP_AI_SERVICE_URL=http://localhost:8000
+      - REACT_APP_ZAMMAD_URL=http://localhost:8080
+      - REACT_APP_BOOKSTACK_URL=http://localhost:6875
+    ports:
+      - "3000:80"
+    networks:
+      - helpdesk_network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: helpdesk_nginx
+    depends_on:
+      - frontend
+      - ai-service
+      - zammad-nginx
+      - bookstack
+    ports:
+      - "80:80"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./logs/nginx:/var/log/nginx
+    networks:
+      - helpdesk_network
+    restart: unless-stopped
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: helpdesk_mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - helpdesk_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+  ollama_data:
+  qdrant_data:
+  zammad_data:
+  bookstack_data:
+
+networks:
+  helpdesk_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
