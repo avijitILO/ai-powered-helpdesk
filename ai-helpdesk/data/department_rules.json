@@ -1,0 +1,24 @@
+{
+  "rules": [
+    {
+      "keywords": ["password", "login", "email", "software", "computer", "laptop", "vpn", "network", "printer", "hardware"],
+      "department": "IT"
+    },
+    {
+      "keywords": ["leave", "vacation", "sick", "employee", "onboarding", "policy", "benefits", "training"],
+      "department": "HR"
+    },
+    {
+      "keywords": ["payroll", "salary", "expense", "reimbursement", "invoice", "budget", "tax"],
+      "department": "Finance"
+    },
+    {
+      "keywords": ["security", "badge", "access", "compliance", "audit"],
+      "department": "Security"
+    },
+    {
+      "keywords": ["facilities", "desk", "office", "parking", "cafeteria"],
+      "department": "Operations"
+    }
+  ]
+}

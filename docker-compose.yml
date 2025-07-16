@@ -1,0 +1,227 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: helpdesk
+      POSTGRES_PASSWORD: helpdesk123
+      POSTGRES_DB: helpdesk_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - helpdesk-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - helpdesk-network
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - helpdesk-network
+
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - helpdesk-network
+
+  # Zammad Ticketing System
+  zammad-elasticsearch:
+    image: bitnami/elasticsearch:8.5.3
+    environment:
+      - ELASTICSEARCH_ENABLE_SECURITY=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    volumes:
+      - zammad_elasticsearch_data:/bitnami/elasticsearch/data
+    networks:
+      - helpdesk-network
+
+  zammad-postgresql:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: zammad
+      POSTGRES_PASSWORD: zammad123
+      POSTGRES_DB: zammad_production
+    volumes:
+      - zammad_postgres_data:/var/lib/postgresql/data
+    networks:
+      - helpdesk-network
+
+  zammad-memcached:
+    image: memcached:alpine
+    command: memcached -m 256M
+    networks:
+      - helpdesk-network
+
+  zammad-railsserver:
+    image: zammad/zammad-docker-compose:latest
+    depends_on:
+      - zammad-memcached
+      - zammad-postgresql
+      - zammad-elasticsearch
+    environment:
+      - RAILS_ENV=production
+      - POSTGRESQL_PASS=zammad123
+      - MEMCACHED_SERVERS=zammad-memcached
+      - ELASTICSEARCH_ENABLED=true
+      - ELASTICSEARCH_HOST=zammad-elasticsearch
+      - ELASTICSEARCH_PORT=9200
+      - ELASTICSEARCH_SCHEMA=http
+      - ELASTICSEARCH_NAMESPACE=zammad
+      - ELASTICSEARCH_REINDEX=true
+      - ELASTICSEARCH_SSL_VERIFY=false
+    volumes:
+      - zammad_data:/opt/zammad
+    restart: unless-stopped
+    networks:
+      - helpdesk-network
+
+  zammad-nginx:
+    image: zammad/zammad-docker-compose:latest
+    command: ["zammad-nginx"]
+    ports:
+      - "8080:8080"
+    depends_on:
+      - zammad-railsserver
+    volumes:
+      - zammad_data:/opt/zammad
+    restart: unless-stopped
+    networks:
+      - helpdesk-network
+
+  zammad-websocket:
+    image: zammad/zammad-docker-compose:latest
+    command: ["zammad-websocket"]
+    depends_on:
+      - zammad-railsserver
+      - zammad-memcached
+    volumes:
+      - zammad_data:/opt/zammad
+    restart: unless-stopped
+    networks:
+      - helpdesk-network
+
+  zammad-scheduler:
+    image: zammad/zammad-docker-compose:latest
+    command: ["zammad-scheduler"]
+    depends_on:
+      - zammad-railsserver
+      - zammad-memcached
+    volumes:
+      - zammad_data:/opt/zammad
+    restart: unless-stopped
+    networks:
+      - helpdesk-network
+
+  # BookStack Knowledge Base
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - APP_URL=http://localhost:6875
+      - DB_HOST=bookstack-db
+      - DB_PORT=3306
+      - DB_USER=bookstack
+      - DB_PASS=bookstack123
+      - DB_DATABASE=bookstackapp
+    volumes:
+      - bookstack_data:/config
+    ports:
+      - "6875:80"
+    depends_on:
+      - bookstack-db
+    restart: unless-stopped
+    networks:
+      - helpdesk-network
+
+  bookstack-db:
+    image: mariadb:10.11
+    environment:
+      - MYSQL_ROOT_PASSWORD=root123
+      - MYSQL_DATABASE=bookstackapp
+      - MYSQL_USER=bookstack
+      - MYSQL_PASSWORD=bookstack123
+    volumes:
+      - bookstack_db_data:/var/lib/mysql
+    networks:
+      - helpdesk-network
+
+  # FastAPI Backend
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://helpdesk:helpdesk123@postgres:5432/helpdesk_db
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - OLLAMA_URL=http://ollama:11434
+      - ZAMMAD_URL=http://zammad-nginx:8080
+      - ZAMMAD_TOKEN=your_zammad_api_token
+      - BOOKSTACK_URL=http://bookstack:80
+      - BOOKSTACK_TOKEN_ID=your_bookstack_token_id
+      - BOOKSTACK_TOKEN_SECRET=your_bookstack_token_secret
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+      - ollama
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    networks:
+      - helpdesk-network
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - helpdesk-network
+
+networks:
+  helpdesk-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  ollama_data:
+  zammad_data:
+  zammad_postgres_data:
+  zammad_elasticsearch_data:
+  bookstack_data:
+  bookstack_db_data:

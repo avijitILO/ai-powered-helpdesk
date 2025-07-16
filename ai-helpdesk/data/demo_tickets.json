@@ -1,0 +1,44 @@
+{
+  "tickets": [
+    {
+      "title": "Cannot access email",
+      "description": "I'm unable to login to my email account. Getting authentication error.",
+      "department": "IT",
+      "category": "Email",
+      "priority": "high",
+      "resolution": "Password was expired. Reset password and enabled 2FA."
+    },
+    {
+      "title": "Payroll query for December",
+      "description": "My December payroll shows incorrect deductions. Please check.",
+      "department": "Finance",
+      "category": "Payroll",
+      "priority": "normal",
+      "resolution": "Tax deductions were calculated incorrectly. Corrected and refund processed."
+    },
+    {
+      "title": "Leave balance inquiry",
+      "description": "Need to know my remaining leave balance for the year.",
+      "department": "HR",
+      "category": "Leave",
+      "priority": "low",
+      "resolution": "Leave balance: 12 days. Details sent via email."
+    },
+    {
+      "title": "Software installation request",
+      "description": "Need Adobe Creative Suite installed on my workstation.",
+      "department": "IT",
+      "category": "Software",
+      "priority": "normal",
+      "resolution": "Adobe Creative Suite installed and activated. License details shared."
+    },
+    {
+      "title": "VPN connection issues",
+      "description": "Unable to connect to VPN from home. Getting timeout error.",
+      "department": "IT",
+      "category": "Network",
+      "priority": "high",
+      "resolution": "VPN certificate expired. New certificate issued and configured."
+    }
+  ]
+}

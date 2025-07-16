@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Helpdesk Assistant</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Helpdesk Assistant</h1>
+            <p>Get help with IT, HR, Finance, and more</p>
+        </header>
+        
+        <div class="chat-container">
+            <div id="messages" class="messages"></div>
+            
+            <div class="input-container">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Type your question here..."
+                    autocomplete="off"
+                />
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+        
+        <div class="info-panel">
+            <div class="department-info">
+                <h3>Quick Links</h3>
+                <button class="dept-btn" data-dept="IT">IT Support</button>
+                <button class="dept-btn" data-dept="HR">HR Queries</button>
+                <button class="dept-btn" data-dept="Finance">Finance Help</button>
+            </div>
+            
+            <div class="recent-tickets">
+                <h3>Your Recent Tickets</h3>
+                <div id="ticketList"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

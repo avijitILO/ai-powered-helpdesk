@@ -1,0 +1,34 @@
+{
+  "articles": [
+    {
+      "title": "Password Reset Guide",
+      "content": "To reset your password: 1. Go to login page 2. Click 'Forgot Password' 3. Enter your email 4. Check email for reset link 5. Create new password with minimum 8 characters, one uppercase, one number, and one special character.",
+      "department": "IT",
+      "category": "Authentication"
+    },
+    {
+      "title": "Leave Application Process",
+      "content": "To apply for leave: 1. Log into HR portal 2. Navigate to Leave Management 3. Click 'Apply Leave' 4. Select leave type and dates 5. Add reason 6. Submit for approval. Leave will be approved within 2 business days.",
+      "department": "HR",
+      "category": "Leave"
+    },
+    {
+      "title": "Expense Reimbursement Policy",
+      "content": "Submit expense claims within 30 days. Required documents: 1. Original receipts 2. Expense form 3. Manager approval. Reimbursement processed within 7-10 business days after approval.",
+      "department": "Finance",
+      "category": "Reimbursement"
+    },
+    {
+      "title": "VPN Setup Instructions",
+      "content": "VPN Setup: 1. Download VPN client from IT portal 2. Install with admin rights 3. Import certificate file 4. Enter server: vpn.company.com 5. Use domain credentials to login. For issues, contact IT support.",
+      "department": "IT",
+      "category": "Network"
+    },
+    {
+      "title": "New Employee Onboarding",
+      "content": "New employee checklist: 1. Complete HR forms 2. IT account creation 3. Security badge issuance 4. Workspace allocation 5. Manager introduction 6. Mandatory training enrollment. Process takes 2-3 days.",
+      "department": "HR",
+      "category": "Onboarding"
+    }
+  ]
+}
