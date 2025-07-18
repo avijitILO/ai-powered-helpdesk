@@ -8,7 +8,7 @@ from ..config import settings
 class OllamaLLM(LLM):
     """Custom Ollama LLM wrapper for Langchain"""
     
-    model: str = "llama2"
+    model: str = "llama3.1:8b-instruct-q4_0"
     base_url: str = "http://ollama:11434"
     
     @property

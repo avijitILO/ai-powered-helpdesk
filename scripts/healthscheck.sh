@@ -1,3 +1,5 @@
+#!/bin/bash
+
 echo ""
 echo "🧪 Testing services..."
 echo -n "Backend API: "
