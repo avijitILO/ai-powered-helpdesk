@@ -57,4 +57,3 @@ ai-helpdesk/
     ├── nginx.conf
     └── zammad_config.rb
 
-    <img width="628" height="931" alt="image" src="https://github.com/user-attachments/assets/7985c39c-8179-40ea-8359-7d0fdfc0b700" />
