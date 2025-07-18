@@ -28,19 +28,41 @@ docker exec helpdesk-ollama ollama pull llama3.1:8b-instruct-q4_0
 
 # Initialize databases
 echo "Initializing databases..."
+docker exec helpdesk-backend cd app
+docker exec helpdesk-backend mkdir scripts
+cp script/init_db.py /app/scripts/init_db.py
 docker exec helpdesk-backend python scripts/init_db.py
 
 # Load demo data
 echo "Loading demo data..."
+cp script/load_demo_data.py /app/scripts/load_demo_data.py
 docker exec helpdesk-backend python scripts/load_demo_data.py
 
 # Train initial embeddings
 echo "Training initial embeddings..."
+cp script/train_embeddings.py /app/scripts/train_embeddings.py
 docker exec helpdesk-backend python scripts/train_embeddings.py
 
 #check container are running
 echo "check container are running"
 docker ps | grep helpdesk
+
+#healthcheck
+echo ""
+echo "🧪 Testing services..."
+echo -n "Backend API: "
+if curl -s http://localhost:8000 | grep -q "AI Helpdesk"; then
+    echo "✅ Working"
+else
+    echo "❌ Not responding"
+fi
+
+echo -n "Ollama API: "
+if curl -s http://localhost:11434 | grep -q "Ollama"; then
+    echo "✅ Working"
+else
+    echo "❌ Not responding"
+fi
 
 echo "Setup complete!"
 echo ""
