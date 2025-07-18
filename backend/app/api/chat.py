@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, List, Dict, Any
 from ..services.llm_service import LLMService
 from ..services.rag_service import RAGService
 from ..services.ticket_service import TicketService
+from ..services.knowledge_service import KnowledgeService
 
 router = APIRouter()
 
@@ -11,6 +12,7 @@ router = APIRouter()
 llm_service = LLMService()
 rag_service = RAGService()
 ticket_service = TicketService()
+knowledge_service = KnowledgeService()
 
 class ChatRequest(BaseModel):
     message: str
@@ -25,30 +27,33 @@ class ChatResponse(BaseModel):
 
 @router.post("/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Process chat message and return AI response"""
+    """Process chat message with ticket creation"""
     try:
-        # Get relevant context from RAG
+        # Search for relevant knowledge
         context = await rag_service.get_context(request.message)
         
-        # Generate response
-        response = await llm_service.generate_response(
-            request.message,
-            context
-        )
+        # Generate response (simple for now)
+        response = f"I understand you need help with: {request.message}. Based on our knowledge base, here's what I found: {context[:200]}..."
         
         # Classify department
-        department = await llm_service.classify_department(request.message)
+        message_lower = request.message.lower()
+        if any(word in message_lower for word in ["password", "login", "email", "vpn", "computer"]):
+            department = "IT"
+        elif any(word in message_lower for word in ["leave", "vacation", "hr", "employee"]):
+            department = "HR"
+        elif any(word in message_lower for word in ["expense", "payroll", "salary", "invoice"]):
+            department = "Finance"
+        else:
+            department = "General"
         
-        # Create ticket if needed (based on keywords or sentiment)
+        # Create ticket if it's an issue/request
         ticket_id = None
-        if any(keyword in request.message.lower() for keyword in ["help", "issue", "problem", "error", "urgent"]):
+        if any(word in message_lower for word in ["help", "issue", "problem", "not working", "error", "can't", "cannot"]):
             ticket_id = await ticket_service.create_ticket({
                 "title": f"Query: {request.message[:50]}...",
                 "description": request.message,
                 "department": department,
-                "user_id": request.user_id,
-                "priority": "normal",
-                "status": "open"
+                "user_id": request.user_id
             })
         
         # Get sources
@@ -62,14 +67,23 @@ async def chat(request: ChatRequest):
         )
         
     except Exception as e:
+        print(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/feedback")
 async def submit_feedback(
-    message_id: str,
-    helpful: bool,
-    feedback: Optional[str] = None
+    ticket_id: str,
+    resolved: bool,
+    resolution: Optional[str] = None
 ):
-    """Submit feedback for a chat response"""
-    # Store feedback for model improvement
-    return {"status": "feedback received"}
+    """Convert resolved ticket to knowledge base article"""
+    if resolved and resolution:
+        # Create KB article from resolution
+        await knowledge_service.create_article({
+            "title": f"Resolution for Ticket {ticket_id}",
+            "content": resolution,
+            "category": "Ticket Resolution",
+            "department": "General"
+        })
+        return {"message": "Feedback received and KB updated"}
+    return {"message": "Feedback received"}

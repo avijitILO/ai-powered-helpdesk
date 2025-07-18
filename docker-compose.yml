@@ -49,128 +49,195 @@ services:
     networks:
       - helpdesk-network
 
-  # Zammad Ticketing System
-  zammad-elasticsearch:
-    image: bitnami/elasticsearch:8.5.3
-    environment:
-      - ELASTICSEARCH_ENABLE_SECURITY=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    volumes:
-      - zammad_elasticsearch_data:/bitnami/elasticsearch/data
-    networks:
-      - helpdesk-network
-
+  # Zammad - Ticketing System
   zammad-postgresql:
     image: postgres:15-alpine
-    container_name: helpdesk-postgres
+    container_name: helpdesk-zammad-db
     environment:
       POSTGRES_USER: zammad
       POSTGRES_PASSWORD: zammad123
-      POSTGRES_DB: zammad_production
+      POSTGRES_DB: zammad
     volumes:
       - zammad_postgres_data:/var/lib/postgresql/data
     networks:
       - helpdesk-network
 
-  zammad-memcached:
-    image: memcached:alpine
-    command: memcached -m 256M
-    networks:
-      - helpdesk-network
-
-  zammad-railsserver:
-    image: zammad/zammad-docker-compose:latest
+  zammad:
+    image: zammad/zammad:5.2
+    container_name: helpdesk-zammad
     depends_on:
-      - zammad-memcached
       - zammad-postgresql
-      - zammad-elasticsearch
+    ports:
+      - "8080:80"
     environment:
-      - RAILS_ENV=production
+      - POSTGRESQL_HOST=zammad-postgresql
+      - POSTGRESQL_USER=zammad
       - POSTGRESQL_PASS=zammad123
-      - MEMCACHED_SERVERS=zammad-memcached
-      - ELASTICSEARCH_ENABLED=true
-      - ELASTICSEARCH_HOST=zammad-elasticsearch
-      - ELASTICSEARCH_PORT=9200
-      - ELASTICSEARCH_SCHEMA=http
-      - ELASTICSEARCH_NAMESPACE=zammad
-      - ELASTICSEARCH_REINDEX=true
-      - ELASTICSEARCH_SSL_VERIFY=false
+      - POSTGRESQL_DB=zammad
+      - RAILS_ENV=production
+      - RAILS_SERVE_STATIC_FILES=true
+      - ZAMMAD_RAILS_AUTOLOAD=true
     volumes:
       - zammad_data:/opt/zammad
-    restart: unless-stopped
     networks:
       - helpdesk-network
 
-  zammad-nginx:
-    image: zammad/zammad-docker-compose:latest
-    command: ["zammad-nginx"]
-    ports:
-      - "8080:8080"
-    depends_on:
-      - zammad-railsserver
-    volumes:
-      - zammad_data:/opt/zammad
-    restart: unless-stopped
-    networks:
-      - helpdesk-network
+  # zammad-elasticsearch:
+  #   image: bitnami/elasticsearch:8.5.3
+  #   environment:
+  #     - ELASTICSEARCH_ENABLE_SECURITY=false
+  #     - ES_JAVA_OPTS=-Xms512m -Xmx512m
+  #   volumes:
+  #     - zammad_elasticsearch_data:/bitnami/elasticsearch/data
+  #   networks:
+  #     - helpdesk-network
 
-  zammad-websocket:
-    image: zammad/zammad-docker-compose:latest
-    command: ["zammad-websocket"]
-    depends_on:
-      - zammad-railsserver
-      - zammad-memcached
-    volumes:
-      - zammad_data:/opt/zammad
-    restart: unless-stopped
-    networks:
-      - helpdesk-network
+  # zammad-postgresql:
+  #   image: postgres:15-alpine
+  #   container_name: helpdesk-postgres
+  #   environment:
+  #     POSTGRES_USER: zammad
+  #     POSTGRES_PASSWORD: zammad123
+  #     POSTGRES_DB: zammad_production
+  #   volumes:
+  #     - zammad_postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - helpdesk-network
 
-  zammad-scheduler:
-    image: zammad/zammad-docker-compose:latest
-    command: ["zammad-scheduler"]
-    depends_on:
-      - zammad-railsserver
-      - zammad-memcached
-    volumes:
-      - zammad_data:/opt/zammad
-    restart: unless-stopped
-    networks:
-      - helpdesk-network
+  # zammad-memcached:
+  #   image: memcached:alpine
+  #   command: memcached -m 256M
+  #   networks:
+  #     - helpdesk-network
 
-  # BookStack Knowledge Base
-  bookstack:
-    image: lscr.io/linuxserver/bookstack:latest
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - APP_URL=http://localhost:6875
-      - DB_HOST=bookstack-db
-      - DB_PORT=3306
-      - DB_USER=bookstack
-      - DB_PASS=bookstack123
-      - DB_DATABASE=bookstackapp
-    volumes:
-      - bookstack_data:/config
-    ports:
-      - "6875:80"
-    depends_on:
-      - bookstack-db
-    restart: unless-stopped
-    networks:
-      - helpdesk-network
+  # zammad-railsserver:
+  #   image: zammad/zammad-docker-compose:latest
+  #   depends_on:
+  #     - zammad-memcached
+  #     - zammad-postgresql
+  #     - zammad-elasticsearch
+  #   environment:
+  #     - RAILS_ENV=production
+  #     - POSTGRESQL_PASS=zammad123
+  #     - MEMCACHED_SERVERS=zammad-memcached
+  #     - ELASTICSEARCH_ENABLED=true
+  #     - ELASTICSEARCH_HOST=zammad-elasticsearch
+  #     - ELASTICSEARCH_PORT=9200
+  #     - ELASTICSEARCH_SCHEMA=http
+  #     - ELASTICSEARCH_NAMESPACE=zammad
+  #     - ELASTICSEARCH_REINDEX=true
+  #     - ELASTICSEARCH_SSL_VERIFY=false
+  #   volumes:
+  #     - zammad_data:/opt/zammad
+  #   restart: unless-stopped
+  #   networks:
+  #     - helpdesk-network
 
+  # zammad-nginx:
+  #   image: zammad/zammad-docker-compose:latest
+  #   command: ["zammad-nginx"]
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     - zammad-railsserver
+  #   volumes:
+  #     - zammad_data:/opt/zammad
+  #   restart: unless-stopped
+  #   networks:
+  #     - helpdesk-network
+
+  # zammad-websocket:
+  #   image: zammad/zammad-docker-compose:latest
+  #   command: ["zammad-websocket"]
+  #   depends_on:
+  #     - zammad-railsserver
+  #     - zammad-memcached
+  #   volumes:
+  #     - zammad_data:/opt/zammad
+  #   restart: unless-stopped
+  #   networks:
+  #     - helpdesk-network
+
+  # zammad-scheduler:
+  #   image: zammad/zammad-docker-compose:latest
+  #   command: ["zammad-scheduler"]
+  #   depends_on:
+  #     - zammad-railsserver
+  #     - zammad-memcached
+  #   volumes:
+  #     - zammad_data:/opt/zammad
+  #   restart: unless-stopped
+  #   networks:
+  #     - helpdesk-network
+
+  # BookStack - Knowledge Base
   bookstack-db:
     image: mariadb:10.11
+    container_name: helpdesk-bookstack-db
     environment:
       - MYSQL_ROOT_PASSWORD=root123
-      - MYSQL_DATABASE=bookstackapp
+      - MYSQL_DATABASE=bookstack
       - MYSQL_USER=bookstack
       - MYSQL_PASSWORD=bookstack123
     volumes:
       - bookstack_db_data:/var/lib/mysql
     networks:
       - helpdesk-network
+
+  bookstack:
+    image: lscr.io/linuxserver/bookstack:latest
+    container_name: helpdesk-bookstack-kb
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - DB_HOST=bookstack-db
+      - DB_PORT=3306
+      - DB_USER=bookstack
+      - DB_PASS=bookstack123
+      - DB_DATABASE=bookstack
+      - APP_URL=http://localhost:6875
+    ports:
+      - "6875:80"
+    volumes:
+      - bookstack_data:/config
+    depends_on:
+      - bookstack-db
+    restart: unless-stopped
+    networks:
+      - helpdesk-network
+
+  # bookstack:
+  #   image: lscr.io/linuxserver/bookstack:latest
+  #   environment:
+  #     - PUID=1000
+  #     - PGID=1000
+  #     - APP_URL=http://localhost:6875
+  #     - DB_HOST=bookstack-db
+  #     - DB_PORT=3306
+  #     - DB_USER=bookstack
+  #     - DB_PASS=bookstack123
+  #     - DB_DATABASE=bookstackapp
+  #   volumes:
+  #     - bookstack_data:/config
+  #   ports:
+  #     - "6875:80"
+  #   depends_on:
+  #     - bookstack-db
+  #   restart: unless-stopped
+  #   networks:
+  #     - helpdesk-network
+
+  # bookstack-db:
+  #   image: mariadb:10.11
+  #   environment:
+  #     - MYSQL_ROOT_PASSWORD=root123
+  #     - MYSQL_DATABASE=bookstackapp
+  #     - MYSQL_USER=bookstack
+  #     - MYSQL_PASSWORD=bookstack123
+  #   volumes:
+  #     - bookstack_db_data:/var/lib/mysql
+  #   networks:
+  #     - helpdesk-network
 
   # FastAPI Backend
   backend:

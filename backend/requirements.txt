@@ -7,6 +7,7 @@ redis==5.0.1
 sqlalchemy==2.0.23
 psycopg2-binary==2.9.9
 pydantic
+pydantic-settings
 httpx
 sentence-transformers
 numpy

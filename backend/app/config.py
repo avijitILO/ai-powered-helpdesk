@@ -14,21 +14,23 @@ class Settings(BaseSettings):
     
     # Ollama
     OLLAMA_URL: str = "http://ollama:11434"
-    OLLAMA_MODEL: str = "llama2"
+    OLLAMA_MODEL: str = "tinyllama"
     
     # Zammad
-    ZAMMAD_URL: str = "http://zammad-nginx:8080"
+    ZAMMAD_URL: Optional[str] = "http://zammad:80"
     ZAMMAD_TOKEN: Optional[str] = None
     
     # BookStack
-    BOOKSTACK_URL: str = "http://bookstack:80"
+    BOOKSTACK_URL: Optional[str] = "http://bookstack:80"
     BOOKSTACK_TOKEN_ID: Optional[str] = None
     BOOKSTACK_TOKEN_SECRET: Optional[str] = None
     
     # Embeddings
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     
-    class Config:
-        env_file = ".env"
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8"
+    }
 
 settings = Settings()
