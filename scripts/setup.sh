@@ -23,19 +23,24 @@ sleep 30
 
 # Initialize Ollama with llama2 model
 echo "Downloading Ollama model..."
-docker exec ai-helpdesk-ollama-1 ollama pull llama2
+#docker exec ai-helpdesk-ollama-1 ollama pull llama2
+docker exec helpdesk-ollama ollama pull llama3.1:8b-instruct-q4_0
 
 # Initialize databases
 echo "Initializing databases..."
-docker exec ai-helpdesk-backend-1 python scripts/init_db.py
+docker exec helpdesk-backend python scripts/init_db.py
 
 # Load demo data
 echo "Loading demo data..."
-docker exec ai-helpdesk-backend-1 python scripts/load_demo_data.py
+docker exec helpdesk-backend python scripts/load_demo_data.py
 
 # Train initial embeddings
 echo "Training initial embeddings..."
-docker exec ai-helpdesk-backend-1 python scripts/train_embeddings.py
+docker exec helpdesk-backend python scripts/train_embeddings.py
+
+#check container are running
+echo "check container are running"
+docker ps | grep helpdesk
 
 echo "Setup complete!"
 echo ""

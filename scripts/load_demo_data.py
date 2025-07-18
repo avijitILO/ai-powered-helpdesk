@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import os
 import json
@@ -32,7 +33,7 @@ async def load_demo_data():
     with open('/app/data/demo_tickets.json', 'r') as f:
         ticket_data = json.load(f)
     
-    print("\\nLoading demo tickets...")
+    print("\nLoading demo tickets...")
     for ticket in ticket_data['tickets']:
         # Create resolved tickets for training
         ticket_id = await ticket_service.create_ticket({
@@ -48,14 +49,14 @@ async def load_demo_data():
         if ticket.get('resolution'):
             await rag_service.add_document({
                 "title": f"Resolution: {ticket['title']}",
-                "content": f"Problem: {ticket['description']}\\n\\nSolution: {ticket['resolution']}",
+                "content": f"Problem: {ticket['description']}\n\nSolution: {ticket['resolution']}",
                 "department": ticket['department'],
                 "category": ticket['category']
             })
         
         print(f"Added ticket: {ticket['title']}")
     
-    print("\\nDemo data loaded successfully!")
+    print("\nDemo data loaded successfully!")
 
 if __name__ == "__main__":
     asyncio.run(load_demo_data())
